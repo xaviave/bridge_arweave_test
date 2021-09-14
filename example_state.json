@@ -1,0 +1,13 @@
+{
+    "ticker": "GMX",
+    "owner": "2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE",
+    "canEvolve": true,
+    "balances": {
+        "locked": 0,
+        "2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE": 999999,
+        "9KrrPsJ2IM9hwnJ9oObddPFHFw2Yk1NTCcVI8WBi1Vc": 1
+    },
+    "waiting_txs": {
+        "2": {"owner": "2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE", "target": "9KrrPsJ2IM9hwnJ9oObddPFHFw2Yk1NTCcVI8WBi1Vc", "qty": 100, "ticker": "GMX", "target_ticker": "XAV"}
+    }
+}
