@@ -35,8 +35,8 @@ interface State {
     waiting_txs: WaitingTx[],
 }
 
-const contract_GMX: Contract = {"ticker": "GMX", "contract_id": ""};
-const contract_XAV: Contract = {"ticker": "XAV", "contract_id": ""};
+const contract_GMX: Contract = {"ticker": "GMX", "contract_id": "60qoAVfToYcG0yryJKrMKO819g8iqJgAxThJuY_ybfo"};
+const contract_XAV: Contract = {"ticker": "XAV", "contract_id": "T31H-saVewKd4vqrTetG-7zkjQjzB6XrJ1sRvjCAw6M"};
 const watchman_wallet_filepath: string = "";
 
 function get_jwk_wallet_from_file(wallet_filepath: string): JWKInterface {
