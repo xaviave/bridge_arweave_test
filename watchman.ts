@@ -93,17 +93,10 @@ function process_waiting_transaction(contractState: State, last_state_file: stri
     let last_state_contrat : State = JSON.parse(raw_state);
     fs.writeFile(last_state_file, raw_state, function(err) { if (err) { return console.error(err); } });
     
-    let s: State = Object.keys(last_state_contrat).reduce((diff, key) => {
-        if (contractState[key] === last_state_contrat[key]) return diff
-        return {
-            ...diff,
-            [key]: last_state_contrat[key]
-        }
-    }, {} as State)
-    
-    for (var tx in s.waiting_txs) {
-        console.log(tx);
-        post_transaction(s.waiting_txs[tx]);
+    let wtx_number: number = Object.keys(contractState.waiting_txs).length;
+    for (let i: number = Object.keys(last_state_contrat.waiting_txs).length - 1; i < wtx_number; i++) {
+        console.log(contractState.waiting_txs[i]);
+        post_transaction(contractState.waiting_txs[i]);
         fee++;
     }
     console.log("__________________________________________________________________");
