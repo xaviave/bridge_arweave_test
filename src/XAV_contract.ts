@@ -9,7 +9,6 @@ interface WaitingTx {
     owner: string,
     target: string,
     qty: number,
-    ticker: string,
     target_ticker: string
 }
 
@@ -23,34 +22,34 @@ type Action = {
         function: string,
         target?: string,
         ticker_target?: string,
-        ticker: string,
         qty?: number,
         approved?: boolean,
     },
+    ticker: string,
     caller: string,
 };
 
 function transfer_XAV(state: State, caller: string, target: string, qty: number) {
     const balances = state.balances;
     
-    balances[caller] -= qty;
-    if (target in balances) {
-        balances[target] += qty;
+    if (balances[caller] >= qty) {
+        if (balances[caller] >= qty) {
+            balances[caller] -= qty;
+            if (target in balances) {
+                balances[target] += qty;
+            } else {
+                balances[target] = qty;
+            }
+        } else {
+            throw new (ContractError as any)(`No enough balance from '${caller}".`);
+        }
     } else {
-        balances[target] = qty;
+        throw new (ContractError as any)(`No balance from '${caller}" in this contract.`);
     }
 }
 
-function transfer_GMX_XAV(state: State, caller: string, qty: number) {
+function transfer_GMX_XAV(state: State, target: string, qty: number) {
     const balances = state.balances;
-    
-    balances[caller] -= qty;
-    balances["locked"] += qty;
-}
-
-function transfer_XAV_GMX(state: State, caller: string, target: string, qty: number) {
-    const balances = state.balances;
-    const waiting_txs = state.waiting_txs;
     
     balances["locked"] -= qty;
     if (target in balances) {
@@ -58,7 +57,23 @@ function transfer_XAV_GMX(state: State, caller: string, target: string, qty: num
     } else {
         balances[target] = qty;
     }
-    waiting_txs[Object.keys(waiting_txs).length] = {"owner": caller, "target": target, "target_ticker": "GMX", "ticker": "XAV", "qty": qty};
+}
+
+function transfer_XAV_GMX(state: State, caller: string, target: string, qty: number) {
+    const balances = state.balances;
+    const waiting_txs = state.waiting_txs;
+    
+    if (caller in balances) {
+        if (balances[caller] >= qty) {
+            balances[caller] -= qty;
+            balances["locked"] += qty;
+            waiting_txs[Object.keys(waiting_txs).length] = {"owner": caller, "target": target, "target_ticker": "GMX", "qty": qty};
+        } else {
+            throw new (ContractError as any)(`No enough balance from '${caller}".`);
+        }
+    } else {
+        throw new (ContractError as any)(`No balance from '${caller}" in this contract.`);
+    }
 }
 
 function balance(state: State, target: string): number {
@@ -80,7 +95,7 @@ export async function handle(state: State, action: Action): Promise<{state?: Sta
     
     if (input.function == 'transfer') {
         const target = input.target!;
-        const ticker = input.ticker;
+        const ticker = action.ticker;
         const ticker_target = input.ticker_target;
         const qty = input.qty;
         
@@ -92,7 +107,7 @@ export async function handle(state: State, action: Action): Promise<{state?: Sta
         } else if (ticker === "XAV" && ticker_target === "XAV") {
             transfer_XAV(state, caller, target, qty);
         } else if (ticker === "GMX" && ticker_target === "XAV") {
-            transfer_GMX_XAV(state, caller, qty);
+            transfer_GMX_XAV(state, target, qty);
         } else {
             throw new (ContractError as any)(`No transfer allowed between: 'XAV' and '${ticker_target}".`);
         }
@@ -101,7 +116,7 @@ export async function handle(state: State, action: Action): Promise<{state?: Sta
     
     if (input.function == 'balance') {
         const target = input.target!;
-        const ticker = input.ticker;
+        const ticker = action.ticker;
         
         if (ticker !== "XAV") {
             throw new (ContractError as any)(`The balance ticker is not allowed.`);

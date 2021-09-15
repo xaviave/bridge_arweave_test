@@ -3,22 +3,26 @@ const ERR_NOTARGET = "No target specified";
 const ERR_INTEGER = "Invalid value. Must be an integer";
 function transfer_GMX(state, caller, target, qty) {
     const balances = state.balances;
-    balances[caller] -= qty;
-    if (target in balances) {
-        balances[target] += qty;
+    if (balances[caller] >= qty) {
+        if (balances[caller] >= qty) {
+            balances[caller] -= qty;
+            if (target in balances) {
+                balances[target] += qty;
+            }
+            else {
+                balances[target] = qty;
+            }
+        }
+        else {
+            throw new ContractError(`No enough balance from '${caller}".`);
+        }
     }
     else {
-        balances[target] = qty;
+        throw new ContractError(`No balance from '${caller}" in this contract.`);
     }
 }
-function transfer_XAV_GMX(state, caller, qty) {
+function transfer_XAV_GMX(state, target, qty) {
     const balances = state.balances;
-    balances[caller] -= qty;
-    balances["locked"] += qty;
-}
-function transfer_GMX_XAV(state, caller, target, qty) {
-    const balances = state.balances;
-    const waiting_txs = state.waiting_txs;
     balances["locked"] -= qty;
     if (target in balances) {
         balances[target] += qty;
@@ -26,7 +30,23 @@ function transfer_GMX_XAV(state, caller, target, qty) {
     else {
         balances[target] = qty;
     }
-    waiting_txs[Object.keys(waiting_txs).length] = { "owner": caller, "target": target, "target_ticker": "XAV", "ticker": "GMX", "qty": qty };
+}
+function transfer_GMX_XAV(state, caller, target, qty) {
+    const balances = state.balances;
+    const waiting_txs = state.waiting_txs;
+    if (caller in balances) {
+        if (balances[caller] > qty) {
+            balances[caller] -= qty;
+            balances["locked"] += qty;
+            waiting_txs[Object.keys(waiting_txs).length] = { "owner": caller, "target": target, "target_ticker": "XAV", "ticker": "GMX", "qty": qty };
+        }
+        else {
+            throw new ContractError(`No enough balance from '${caller}".`);
+        }
+    }
+    else {
+        throw new ContractError(`No enough balance from '${caller}".`);
+    }
 }
 function balance(state, target) {
     ContractAssert(target, ERR_NOTARGET);
@@ -43,13 +63,13 @@ export async function handle(state, action) {
     const caller = action.caller;
     if (input.function == 'transfer') {
         const target = input.target;
-        const ticker = input.ticker;
+        const ticker = action.ticker;
         const ticker_target = input.ticker_target;
         const qty = input.qty;
         ContractAssert(qty, ERR_INTEGER);
         check_transfer_args(caller, target, qty);
         if (ticker === "XAV" && ticker_target === "GMX") {
-            transfer_XAV_GMX(state, caller, qty);
+            transfer_XAV_GMX(state, target, qty);
         }
         else if (ticker === "GMX" && ticker_target === "GMX") {
             transfer_GMX(state, caller, target, qty);
@@ -64,7 +84,7 @@ export async function handle(state, action) {
     }
     if (input.function == 'balance') {
         const target = input.target;
-        const ticker = input.ticker;
+        const ticker = action.ticker;
         if (ticker !== "GMX") {
             throw new ContractError(`The balance ticker is not allowed.`);
         }

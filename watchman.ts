@@ -9,8 +9,6 @@ import fs = require('fs');
 import Arweave = require('arweave');
 import { JWKInterface } from 'arweave/node/lib/wallet';
 import Smartweave = require('smartweave');
-import Wallets from 'arweave/node/wallets';
-import { raw } from 'body-parser';
 
 const arweave = Arweave.init({
     host: 'arweave.net',
@@ -35,9 +33,9 @@ interface State {
     waiting_txs: WaitingTx[],
 }
 
-const contract_GMX: Contract = {"ticker": "GMX", "contract_id": "X7TCsMY0jVDYxCZg_MsD_kmnVP7hwqSft14r5Cvn5rQ"};
-const contract_XAV: Contract = {"ticker": "XAV", "contract_id": "eNNwRcwhMSO8enkaSKjvghV9Td2mDvKC0fDaS7YXI-s"};
-const watchman_wallet_filepath: string = "";
+const contract_GMX: Contract = {"ticker": "GMX", "contract_id": "uzeI6A6dqoRpzBFHy5acTQM3f0-Qu3KuR2f2Q67e2aE"};
+const contract_XAV: Contract = {"ticker": "XAV", "contract_id": "JLS8jpNJmVfVV3Yjh0oJvqUxKxNr5ACc4oknwne12Fo"};
+const watchman_wallet_filepath: string = "/mnt/c/Users/hellx/Documents/arweave_wallet/arweave-key-2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE.json";
 
 function get_jwk_wallet_from_file(wallet_filepath: string): JWKInterface {
     const file_wallet: string = fs.readFileSync(wallet_filepath, 'utf8');
@@ -46,6 +44,9 @@ function get_jwk_wallet_from_file(wallet_filepath: string): JWKInterface {
 }
 
 function get_jwk_wallet_from_key(pub_key: string): JWKInterface {
+    console.log(pub_key + " | use arconnect when needed or wallet file")
+    return get_jwk_wallet_from_file(watchman_wallet_filepath);
+
     const wallet_filepath: string = "";
     const file_wallet: string = fs.readFileSync(wallet_filepath, 'utf8');
     
@@ -76,7 +77,8 @@ async function post_transaction(wtx: WaitingTx) {
     validate_transaction();
     
     const owner_wallet: JWKInterface = get_jwk_wallet_from_key(wtx.owner);
-    
+    console.log("Owner wallet: " + owner_wallet);
+
     const tx = await arweave.createTransaction({ target: wtx.target, quantity: wtx.qty.toString() }, owner_wallet);
     await arweave.transactions.sign(tx, owner_wallet);
     
@@ -87,16 +89,21 @@ async function post_transaction(wtx: WaitingTx) {
 }
 
 function process_waiting_transaction(contractState: State, last_state_file: string): number {
+    console.log("Loadind " + last_state_file);
     let fee: number = 0;
     let raw_state: string = fs.readFileSync(last_state_file, 'utf-8');
     let last_state_contrat : State = JSON.parse(raw_state);
+
     fs.writeFile(last_state_file, raw_state, function(err) { if (err) { return console.error(err); } });
-    
+
     let wtx_number: number = Object.keys(contractState.waiting_txs).length;
-    for (let i: number = Object.keys(last_state_contrat.waiting_txs).length - 1; i < wtx_number; i++) {
-        console.log(contractState.waiting_txs[i]);
-        post_transaction(contractState.waiting_txs[i]);
-        fee++;
+    if (wtx_number > 0) {
+        for (let i: number = Object.keys(last_state_contrat.waiting_txs).length - 1; i < wtx_number; i++) {
+            console.log("contrat state = ", contractState);
+            console.log("wainting_txs: " + contractState.waiting_txs[i]);
+            post_transaction(contractState.waiting_txs[i]);
+            fee++;
+        }
     }
     console.log("__________________________________________________________________");
     return (fee);
@@ -111,11 +118,15 @@ function watch_contracts(watchman_wallet: JWKInterface): void {
         fee += process_waiting_transaction(contractState, 'XAV_initial_state.json');
     });
     // need function to pay the watchman with fees number
+    if (watchman_wallet) {
+        console.log("pay " + fee + " times watchman");
+    }
 }
 
 (async () => {
     const reload_interval: number = 60 * 1000; // 60s
     const gmx_wallet = get_jwk_wallet_from_file(watchman_wallet_filepath);
     
+    console.log("Start watchman")
     setInterval(()=> { watch_contracts(gmx_wallet) }, reload_interval);
 })()
