@@ -35,8 +35,8 @@ interface State {
     waiting_txs: WaitingTx[],
 }
 
-const contract_GMX: Contract = {"ticker": "GMX", "contract_id": "60qoAVfToYcG0yryJKrMKO819g8iqJgAxThJuY_ybfo"};
-const contract_XAV: Contract = {"ticker": "XAV", "contract_id": "T31H-saVewKd4vqrTetG-7zkjQjzB6XrJ1sRvjCAw6M"};
+const contract_GMX: Contract = {"ticker": "GMX", "contract_id": "X7TCsMY0jVDYxCZg_MsD_kmnVP7hwqSft14r5Cvn5rQ"};
+const contract_XAV: Contract = {"ticker": "XAV", "contract_id": "eNNwRcwhMSO8enkaSKjvghV9Td2mDvKC0fDaS7YXI-s"};
 const watchman_wallet_filepath: string = "";
 
 function get_jwk_wallet_from_file(wallet_filepath: string): JWKInterface {
@@ -75,7 +75,6 @@ async function post_transaction(wtx: WaitingTx) {
     // get a validation function to accept or refuse the tx
     validate_transaction();
     
-    // get JWKInterface from tx.owner 
     const owner_wallet: JWKInterface = get_jwk_wallet_from_key(wtx.owner);
     
     const tx = await arweave.createTransaction({ target: wtx.target, quantity: wtx.qty.toString() }, owner_wallet);
