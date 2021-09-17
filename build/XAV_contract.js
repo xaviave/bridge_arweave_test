@@ -63,7 +63,7 @@ export async function handle(state, action) {
     const caller = action.caller;
     if (input.function == 'transfer') {
         const target = input.target;
-        const ticker = action.ticker;
+        const ticker = state.ticker;
         const ticker_target = input.ticker_target;
         const qty = input.qty;
         ContractAssert(qty, ERR_INTEGER);
@@ -78,13 +78,13 @@ export async function handle(state, action) {
             transfer_GMX_XAV(state, target, qty);
         }
         else {
-            throw new ContractError(`No transfer allowed between: 'XAV' and '${ticker_target}".`);
+            throw new ContractError(`No transfer allowed between: 'XAV' and '${ticker_target}'.`);
         }
         return { state };
     }
     if (input.function == 'balance') {
         const target = input.target;
-        const ticker = action.ticker;
+        const ticker = state.ticker;
         if (ticker !== "XAV") {
             throw new ContractError(`The balance ticker is not allowed.`);
         }

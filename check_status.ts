@@ -6,10 +6,13 @@ const arweave = Arweave.init({
   port: 443
 });
 
-const tx_id: string = 'uzeI6A6dqoRpzBFHy5acTQM3f0-Qu3KuR2f2Q67e2aE'
+const tx_id: string = 'pWPg4kf2P8_thUMgijjy19FL91OdZ7UCmvjM2MpdmIU'
 
 arweave.transactions.getStatus(tx_id)
 .then(res => {
   console.log("[SUCCESS]: " + JSON.stringify(res, null, 4));
 })
 .catch(error => { console.log("[ERROR]: " + error) });
+
+// how verto get fee from transaction
+

@@ -13,6 +13,7 @@ interface WaitingTx {
 }
 
 type State = {
+    ticker: string,
     balances: Record<string, number>,
     waiting_txs: Record<string, WaitingTx>,
 };
@@ -25,8 +26,7 @@ type Action = {
         qty?: number,
         approved?: boolean,
     },
-    ticker: string,
-    caller: string,
+    caller: string
 };
 
 function transfer_XAV(state: State, caller: string, target: string, qty: number) {
@@ -95,7 +95,7 @@ export async function handle(state: State, action: Action): Promise<{state?: Sta
     
     if (input.function == 'transfer') {
         const target = input.target!;
-        const ticker = action.ticker;
+        const ticker = state.ticker;
         const ticker_target = input.ticker_target;
         const qty = input.qty;
         
@@ -109,14 +109,14 @@ export async function handle(state: State, action: Action): Promise<{state?: Sta
         } else if (ticker === "GMX" && ticker_target === "XAV") {
             transfer_GMX_XAV(state, target, qty);
         } else {
-            throw new (ContractError as any)(`No transfer allowed between: 'XAV' and '${ticker_target}".`);
+            throw new (ContractError as any)(`No transfer allowed between: 'XAV' and '${ticker_target}'.`);
         }
         return { state };
     }
     
     if (input.function == 'balance') {
         const target = input.target!;
-        const ticker = action.ticker;
+        const ticker = state.ticker;
         
         if (ticker !== "XAV") {
             throw new (ContractError as any)(`The balance ticker is not allowed.`);
