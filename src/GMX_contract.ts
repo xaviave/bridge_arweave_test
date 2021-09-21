@@ -1,9 +1,16 @@
 const ERR_NOQTY = "No qty specified";
+const ERR_NEGQTY = "Invalid value for qty. Must be positive";
 const ERR_NOTARGET = "No target specified";
 const ERR_INTEGER = "Invalid value. Must be an integer";
+const ERR_TICKER = "The balance ticker is not allowed.";
 
 declare function ContractError(e: string): void;
 declare function ContractAssert(cond: any, e: string): asserts cond;
+
+interface Vote {
+    min_vote: number,
+    voter: Record<string, number>
+}
 
 interface WaitingTx {
     owner: string,
@@ -11,6 +18,7 @@ interface WaitingTx {
     qty: number,
     ticker: string,
     target_ticker: string
+    vote: Vote
 }
 
 type State = {
@@ -25,7 +33,7 @@ type Action = {
         target?: string,
         ticker_target?: string,
         qty?: number,
-        approved?: boolean,
+        voter?: string,
     },
     caller: string
 };
@@ -69,12 +77,26 @@ function transfer_GMX_XAV(state: State, caller: string, target: string, qty: num
             balances[caller] -= qty;
             balances["locked"] += qty;
             // need a hash for this not just a number
-            waiting_txs[Object.keys(waiting_txs).length] = {"owner": caller, "target": target, "target_ticker": "XAV", "ticker": "GMX", "qty": qty};
+            waiting_txs[Object.keys(waiting_txs).length] = {"owner": caller, "target": target, "target_ticker": "XAV", "ticker": "GMX", "qty": qty, "vote": {} as Vote};
         } else {
-            throw new (ContractError as any)(`No enough balance from '${caller}".`);
+            throw new (ContractError as any)(`No enough balance from '${caller}'.`);
         }
     } else {
-        throw new (ContractError as any)(`No enough balance from '${caller}".`);
+        throw new (ContractError as any)(`No enough balance from '${caller}'.`);
+    }
+}
+
+function vote_wainting_transaction(state: State, target: string, voter: string, qty: number) {
+    const waiting_tx =  state.waiting_txs;
+    const waiting_tx_vote = waiting_tx.vote;
+
+    if (voter in waiting_tx_vote.voter) {
+        throw new Error(`'${target}' already vote in this transaction`);
+    } else {
+        waiting_tx_vote.voter[voter] = qty;
+    }
+    if (waiting_tx_vote.voter.length > waiting_tx_vote.min_vote) {
+        console.log("ahhh");
     }
 }
 
@@ -86,7 +108,7 @@ function balance(state: State, target: string): number {
 
 function check_transfer_args(caller: string, target: string, qty: number) {
     ContractAssert(qty, ERR_NOQTY);
-    ContractAssert(qty > 0, "Invalid value for qty. Must be positive");
+    ContractAssert(qty > 0, ERR_NEGQTY);
     ContractAssert(target, ERR_NOTARGET);
     ContractAssert(target !== caller, "Target must be different from the caller");
 }
@@ -121,10 +143,17 @@ export async function handle(state: State, action: Action): Promise<{state?: Sta
         const ticker = state.ticker;
         
         if (ticker !== "GMX") {
-            throw new (ContractError as any)(`The balance ticker is not allowed.`);
+            throw new (ContractError as any)(ERR_TICKER);
         }
         return { result: { target: ticker, balance: balance(state, target) } }
     }
     
+    if (input.function == 'vote') {
+        const target = input.target!;
+        const voter = input.voter!;
+        const qty = input.qty!;
+        
+        vote_wainting_transaction(state, target, voter, qty);
+    }
     throw new (ContractError as any)(`No function supplied or function not recognised: "${input.function}".`);
 }
