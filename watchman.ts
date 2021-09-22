@@ -3,6 +3,7 @@ import Arweave = require('arweave');
 import { JWKInterface } from 'arweave/node/lib/wallet';
 import Smartweave = require('smartweave');
 import util = require('util')
+import sha256 =  require('crypto-js/sha256');
 
 const arweave = Arweave.init({
     host: 'arweave.net',
@@ -27,7 +28,7 @@ const contracts = {
     XAV: "Mb0YYVMX5Vb7LzvUlOpKgUWWlw2iw49IXE794T_PIv4"
 };
 
-const watchman_wallet_filepath: string = "/mnt/c/Users/hellx/Documents/arweave_wallet/arweave-key-2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE.json";
+const validator_wallet_filepath: string = "/mnt/c/Users/hellx/Documents/arweave_wallet/arweave-key-2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE.json";
 
 function get_jwk_wallet_from_file(wallet_filepath: string): JWKInterface {
     const file_wallet: string = fs.readFileSync(wallet_filepath, 'utf8');
@@ -37,7 +38,7 @@ function get_jwk_wallet_from_file(wallet_filepath: string): JWKInterface {
 
 function get_jwk_wallet_from_key(pub_key: string): JWKInterface {
     console.log(pub_key + " | use arconnect when needed or wallet file")
-    return get_jwk_wallet_from_file(watchman_wallet_filepath);
+    return get_jwk_wallet_from_file(validator_wallet_filepath);
     
     const wallet_filepath: string = "";
     const file_wallet: string = fs.readFileSync(wallet_filepath, 'utf8');
@@ -58,23 +59,14 @@ async function get_status(tx_id: string): Promise<number> {
     return (ret);
 }
 
-function validate_transaction() {
-    /*
-    get votes from watchmens -> decentralized part
-    */
-}
-
-async function post_transaction(wtx: WaitingTx) {
-    // get a validation function to accept or refuse the tx
-    validate_transaction();
-    
+async function post_transaction(validator_wallet: JWKInterface, wtx_id: string, wtx: WaitingTx) {
     const owner_wallet: JWKInterface = get_jwk_wallet_from_key(wtx.owner);
     
-    const tx_input = {function: "transfer", qty: wtx.qty, ticker_target: wtx.target_ticker, target: wtx.target};
-    // check if there is a proper way than 'as any'
+    const tx_input = {function: "vote", tx_target: wtx_id, voter: validator_wallet}
     const contract_id: string = (contracts as any)[wtx.target_ticker];
     
-    // console.log(util.inspect(await Smartweave.interactWriteDryRun(arweave, owner_wallet, contract_id, tx_input), {showHidden: false, depth: null, colors: true}));
+    console.log(util.inspect(await Smartweave.interactWriteDryRun(arweave, owner_wallet, contract_id, tx_input), {showHidden: false, depth: null, colors: true}));
+    /*
     const tx_id = await Smartweave.interactWrite(arweave, owner_wallet, contract_id, tx_input);
     await new Promise(f => setTimeout(f, 10000));
     
@@ -82,9 +74,10 @@ async function post_transaction(wtx: WaitingTx) {
         await arweave.transactions.post(tx_id);
         await new Promise(f => setTimeout(f, 10000));
     }
+    */
 }
 
-function process_waiting_transaction(contractState: State, last_state_file: string): number {
+function process_waiting_transaction(validator_wallet: JWKInterface, contractState: State, last_state_file: string): number {
     console.log("Loading " + last_state_file);
     let fee: number = 0;
     let raw_state: string = fs.readFileSync(last_state_file, 'utf-8');
@@ -92,40 +85,56 @@ function process_waiting_transaction(contractState: State, last_state_file: stri
     
     fs.writeFile(last_state_file, raw_state, function(err) { if (err) { return console.error(err); } });
     
-    let wtx_number: number = Object.keys(contractState.waiting_txs).length;
-    let start = 0;
     if (Object.keys(last_state_contrat.waiting_txs).length > 0) {
-        start = Object.keys(last_state_contrat.waiting_txs).length - 1
-    }
-    if (wtx_number > start) {
-        for (let i: number = start; i < wtx_number; i++) {
-            // console.log("wainting_txs: " + contractState.waiting_txs[i]);
-            post_transaction(contractState.waiting_txs[i]);
+        const state_key = (Object.keys(Object.keys(contractState.waiting_txs)) as Array<string>);
+        const last_state_key = (Object.keys(Object.keys(last_state_contrat.waiting_txs)) as Array<string>);
+        const waiting_txs_key = state_key.filter(x => last_state_key.indexOf(x) === -1);
+
+        for (let k in waiting_txs_key) {
+            console.log(k)
+            post_transaction(validator_wallet, k, contractState.waiting_txs[k]);
             fee++;
         }
     }
     console.log("__________________________________________________________________");
     return (fee);
 }
+async function lock_validator_wallet(contract_id: string, validator_wallet: JWKInterface) {
+    // locked validator_wallet for X block
+    const address: string = await arweave.wallets.jwkToAddress(validator_wallet);
+    const tx_input = {function: "lock_balance", target: address, voter: validator_wallet}
+    const tx_id = await Smartweave.interactWrite(arweave, validator_wallet, contract_id, tx_input);
 
-function watch_contracts(watchman_wallet: JWKInterface): void {
+    let status: number = 202;
+    while (status in [404, 202]) {
+        status = await get_status(tx_id);
+        if (status == 404) {
+            await arweave.transactions.post(tx_id);
+        }  
+        await new Promise(f => setTimeout(f, 10000));
+    }
+}
+
+function watch_contracts(validator_wallet: JWKInterface): void {
+    // get the block id of each tx to add lock time
     let fee: number = 0;
     Smartweave.readContract(arweave, contracts["GMX"]).then(contractState => {
-        fee += process_waiting_transaction(contractState, 'states/GMX_initial_state.json');
+        lock_validator_wallet(contracts["GMX"], validator_wallet);
+        fee += process_waiting_transaction(validator_wallet, contractState, 'states/GMX_initial_state.json');
     });
     Smartweave.readContract(arweave, contracts["XAV"]).then(contractState => {
-        fee += process_waiting_transaction(contractState, 'states/XAV_initial_state.json');
+        fee += process_waiting_transaction(validator_wallet, contractState, 'states/XAV_initial_state.json');
     });
     // need function to pay the watchman with fees number
-    if (watchman_wallet) {
+    if (validator_wallet) {
         console.log("pay " + fee + " times watchman");
     }
 }
 
 (async () => {
     const reload_interval: number = 60 * 1000; // 60s
-    const gmx_wallet = get_jwk_wallet_from_file(watchman_wallet_filepath);
-    
+    const validator_wallet = get_jwk_wallet_from_file(validator_wallet_filepath);
     console.log("Start watchman")
-    setInterval(()=> { watch_contracts(gmx_wallet) }, reload_interval);
+
+    setInterval(()=> { watch_contracts(validator_wallet) }, reload_interval);
 })()
