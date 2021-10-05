@@ -119,8 +119,10 @@ function watch_contracts(validator_wallet: JWKInterface): void {
         process_waiting_transaction(validator_wallet, contractState, 'states/GMX_initial_state.json');
     });
     Smartweave.readContract(arweave, contracts["XAV"]).then(contractState => {
+        lock_validator_wallet(contracts["XAV"], validator_wallet);
         process_waiting_transaction(validator_wallet, contractState, 'states/XAV_initial_state.json');
     });
+    // need to check to unlock vault
 }
 
 (async () => {
@@ -130,14 +132,3 @@ function watch_contracts(validator_wallet: JWKInterface): void {
 
     setInterval(()=> { watch_contracts(validator_wallet) }, reload_interval);
 })()
-
-/*
--> Validation
-    1. lock vault
-    2. process waiting transaction
-    3. vote
-
--------------------------------------
-
--> Transfer
-*/
