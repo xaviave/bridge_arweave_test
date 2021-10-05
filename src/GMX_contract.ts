@@ -3,8 +3,6 @@ const ERR_NEGQTY = "Invalid value for qty. Must be positive";
 const ERR_NOTARGET = "No target specified";
 const ERR_INTEGER = "Invalid value. Must be an integer";
 const ERR_TICKER = "The balance ticker is not allowed.";
-const ERR_TRANSNOTVALID = "Transfer not validate by validators";
-const ERR_VALIDATOR = "Validator id is not valid";
 
 declare function ContractError(e: string): void;
 declare function ContractAssert(cond: any, e: string): asserts cond;
@@ -24,6 +22,12 @@ interface WaitingTx {
 }
 
 interface Balance {
+    /*
+    qty: token holding
+    block: number height to unlock stake transfer
+    lock: lock the transfer between qty and stake while working as validator
+    WIP // age: add additionnal age weight allowing long date honest validator to increase their stake
+    */
     qty: number,
     block: number,
     locked: boolean
@@ -33,7 +37,6 @@ type State = {
     ticker: string,
     balances: Record<string, Balance>,
     waiting_txs: Record<string, WaitingTx>,
-    validators: string[]
 };
 
 type Action = {
@@ -110,14 +113,36 @@ function transfer_GMX_XAV(state: State, caller: string, target: string, qty: num
         if (balances[caller].qty > qty) {
             balances[caller],qty -= qty;
             balances["locked"].qty += qty;
-            // need a hash for this not just a number
-            waiting_txs[Object.keys(waiting_txs).length] = {"owner": caller, "target": target, "target_ticker": "XAV", "ticker": "GMX", "qty": qty, "vote": {} as Vote};
+            
+            waiting_txs[Smartweave.transaction.id] = {"owner": caller, "target": target, "target_ticker": "XAV", "ticker": "GMX", "qty": qty, "vote": {} as Vote};
         } else {
             throw new (ContractError as any)(`No enough balance from '${caller}'.`);
         }
     } else {
         throw new (ContractError as any)(`No enough balance from '${caller}'.`);
     }
+}
+
+function select_winner(state: State, waiting_tx_vote: Vote) {
+    let tmp: number = 0
+    let total_stake: number = 0
+    
+    for (let key in waiting_tx_vote.voter) {
+        if (waiting_tx_vote.voter[key] > 0) {
+            total_stake += state.balances[key].qty;
+        }
+    }
+
+    let winner_stake: number = Math.floor(Math.random() * total_stake);
+    for (let key in waiting_tx_vote.voter) {
+        if (waiting_tx_vote.voter[key] > 0) {
+            tmp += state.balances[key].qty;
+            if (winner_stake < tmp) {
+                return key
+            }
+        }
+    }
+    return "error";
 }
 
 function vote_waiting_transaction(state: State, target: string, voter: string, qty: number) {
@@ -130,6 +155,8 @@ function vote_waiting_transaction(state: State, target: string, voter: string, q
     ** voter: wallet id of the validator
     ** qty: 1 (authorize) - 0 (forbid)
     */
+
+    // validator that propose a bad transaction receives a slashing penalty else the selected validator receive a reward
     
     const waiting_tx =  state.waiting_txs[target];
     const waiting_tx_vote = waiting_tx.vote;
@@ -137,32 +164,25 @@ function vote_waiting_transaction(state: State, target: string, voter: string, q
     if (voter in waiting_tx_vote.voter) {
         throw new (ContractError as any)(`'${target}' already vote in this transaction`);
     } else {
-        waiting_tx_vote.voter[voter] = qty;
+        waiting_tx_vote.voter[voter] = qty
     }
 
     if (waiting_tx_vote.voter.length >= waiting_tx_vote.min_vote) {
-        let pos_vote: number = 0;
-        for (let key in waiting_tx_vote.voter) {
-            if (waiting_tx_vote.voter[key] == 1) {
-                pos_vote++;
-            }
-        }
-        
-        const target_qty: number = waiting_tx.qty;
-        const target_wallet: string = waiting_tx.target;
-        delete state.waiting_txs[target];
-        if (pos_vote >= waiting_tx_vote.min_vote / 2) {
-            transfer_XAV_GMX(state, target_wallet, target_qty);
+        let validator: string = select_winner(state, waiting_tx_vote);
+        if (validator === "error" || waiting_tx_vote.voter[validator] === 0) {
+            // slashing penalty 120% fee
+            state.balances[validator].qty -= SmartWeave.transaction.reward + SmartWeave.transaction.reward * 0.2;
         } else {
-            throw new (ContractError as any)(ERR_TRANSNOTVALID);
+            transfer_XAV_GMX(state, waiting_tx.target, waiting_tx.qty);
+            // pay validator 110% fee
+            state.balances[validator].qty += SmartWeave.transaction.reward + SmartWeave.transaction.reward * 0.1;
         }
+        delete state.waiting_txs[target];
     }
+    return { state };
 }
 
 function balance(state: State, target: string): number {
-    /*
-    ** Get the balance of specified target wallet id
-    */
     ContractAssert(target, ERR_NOTARGET);
     return state.balances[target].qty ?? 0;
 }
@@ -189,9 +209,7 @@ export async function handle(state: State, action: Action): Promise<{state?: Sta
         ContractAssert(qty, ERR_INTEGER);
         check_transfer_args(caller, target, qty);
         
-        if (ticker === "XAV" && ticker_target === "GMX") {
-            transfer_XAV_GMX(state, target, qty);
-        } else if (ticker === "GMX" && ticker_target === "GMX") {
+        if (ticker === "GMX" && ticker_target === "GMX") {
             transfer_GMX(state, caller, target, qty);
         } else if (ticker === "GMX" && ticker_target === "XAV") {
             transfer_GMX_XAV(state, caller, target, qty);
@@ -217,17 +235,12 @@ export async function handle(state: State, action: Action): Promise<{state?: Sta
         const qty = input.qty!;
         
         ContractAssert(!state.balances[voter].locked, `'${voter}' balance is currently not locked. The vote is not allowed`);
-        vote_waiting_transaction(state, target, voter, qty);
+        return vote_waiting_transaction(state, target, voter, qty);
     }
     
     if (input.function == 'lock_balance') {
         const target = input.target!;
         const block_timer = input.timer;
-        const validators = state.validators;
-
-        if (!(caller in validators)) {
-            throw new (ContractError as any)(ERR_VALIDATOR);
-        }
 
         state.balances[target].locked = true;
         state.balances[target].block = await SmartWeave.block.height + block_timer;
@@ -236,11 +249,7 @@ export async function handle(state: State, action: Action): Promise<{state?: Sta
     
     if (input.function == 'unlock_balance') {
         const target = input.target!;
-        const validators = state.validators;
 
-        if (!(caller in validators)) {
-            throw new (ContractError as any)(ERR_VALIDATOR);
-        }
         if (state.balances[target].block < await SmartWeave.block.height) {
             ContractAssert(!state.balances[target].locked, `'${target}' balance is currently not locked. Can't be unlocked since block ${state.balances[target].block} is reached`);
         }
