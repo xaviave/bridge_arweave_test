@@ -2,17 +2,17 @@
     "ticker": "GMX",
     "owner": "2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE",
     "canEvolve": true,
-    "validators": ["2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE"],
     "balances": {
+        "locked": 0,
+        "2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE": 1000000
+    },
+    "vault": {
         "locked": {"qty": 0, "block": 0, "locked": false},
-        "2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE": {"qty": 999999, "block": 88293, "locked": true},
-        "9KrrPsJ2IM9hwnJ9oObddPFHFw2Yk1NTCcVI8WBi1Vc": {"qty": 1, "block": 0, "locked": false}
+        "2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE": {"balance": 999999, "block": 0, "locked": true},
+        "9KrrPsJ2IM9hwnJ9oObddPFHFw2Yk1NTCcVI8WBi1Vc": {"balance": 1, "block": 0, "locked": false}
     },
     "waiting_txs": {
         "1": {"owner": "2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE", "target": "9KrrPsJ2IM9hwnJ9oObddPFHFw2Yk1NTCcVI8WBi1Vc", "qty": 100, "ticker": "GMX", "target_ticker": "XAV", "vote": {"min_vote": 2, "voter": {}}},
-        "2": {"owner": "2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE", "target": "9KrrPsJ2IM9hwnJ9oObddPFHFw2Yk1NTCcVI8WBi1Vc", "qty": 100, "ticker": "GMX", "target_ticker": "XAV", "vote": {"min_vote": 2, "voter": {"2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE": 1}}},
-        "3": {"owner": "2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE", "target": "9KrrPsJ2IM9hwnJ9oObddPFHFw2Yk1NTCcVI8WBi1Vc", "qty": 100, "ticker": "GMX", "target_ticker": "XAV", "vote": {"min_vote": 2, "voter": {}}},
-        "4": {"owner": "2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE", "target": "9KrrPsJ2IM9hwnJ9oObddPFHFw2Yk1NTCcVI8WBi1Vc", "qty": 100, "ticker": "GMX", "target_ticker": "XAV", "vote": {"min_vote": 2, "voter": {}}},
-        "5": {"owner": "2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE", "target": "9KrrPsJ2IM9hwnJ9oObddPFHFw2Yk1NTCcVI8WBi1Vc", "qty": 100, "ticker": "GMX", "target_ticker": "XAV", "vote": {"min_vote": 2, "voter": {}}}
+        "2": {"owner": "2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE", "target": "9KrrPsJ2IM9hwnJ9oObddPFHFw2Yk1NTCcVI8WBi1Vc", "qty": 100, "ticker": "GMX", "target_ticker": "XAV", "vote": {"min_vote": 2, "voter": {"2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE": 1}}}
     }
-}
+}   

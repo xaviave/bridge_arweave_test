@@ -6,6 +6,8 @@
         "locked": 0,
         "2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE": 1000000
     },
-    "waiting_txs": {
-    }
-  }
+    "vault": {
+        "locked": {"qty": 0, "block": 0, "locked": false}
+    },
+    "waiting_txs": {}
+}

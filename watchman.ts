@@ -100,7 +100,7 @@ function process_waiting_transaction(validator_wallet: JWKInterface, contractSta
 async function lock_validator_wallet(contract_id: string, validator_wallet: JWKInterface) {
     // locked validator_wallet for X block
     const address: string = await arweave.wallets.jwkToAddress(validator_wallet);
-    const tx_input = {function: "lock_balance", target: address, voter: validator_wallet, block_timer: 10}
+    const tx_input = {function: "lock_vault", target: address, voter: validator_wallet, block_timer: 10}
     const tx_id = await Smartweave.interactWrite(arweave, validator_wallet, contract_id, tx_input);
 
     let status: number = 202;
@@ -130,3 +130,14 @@ function watch_contracts(validator_wallet: JWKInterface): void {
 
     setInterval(()=> { watch_contracts(validator_wallet) }, reload_interval);
 })()
+
+/*
+-> Validation
+    1. lock vault
+    2. process waiting transaction
+    3. vote
+
+-------------------------------------
+
+-> Transfer
+*/
