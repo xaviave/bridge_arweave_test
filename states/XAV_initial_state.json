@@ -2,6 +2,7 @@
     "ticker": "XAV",
     "owner": "2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE",
     "canEvolve": true,
+    "timer": 10,
     "balances": {
         "locked": 0,
         "2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE": 1000000

@@ -2,12 +2,11 @@
     "ticker": "GMX",
     "owner": "2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE",
     "canEvolve": true,
+    "timer": 10,
     "balances": {
         "locked": 0,
         "2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE": 1000000
     },
-    "vault": {
-        "locked": {"qty": 0, "block": 0, "locked": false}
-    },
+    "vault": {},
     "waiting_txs": {}
 }

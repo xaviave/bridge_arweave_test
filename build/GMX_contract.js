@@ -2,7 +2,6 @@ const ERR_NOQTY = "No qty specified";
 const ERR_NEGQTY = "Invalid value for qty. Must be positive";
 const ERR_NOTARGET = "No target specified";
 const ERR_INTEGER = "Invalid value. Must be an integer";
-const ERR_TICKER = "The balance ticker is not allowed.";
 function transfer_GMX(state, caller, target, qty) {
     const balances = state.balances;
     if (caller === "locked") {
@@ -61,7 +60,7 @@ function increase_vault(state, caller, qty) {
     if (!(caller in vault)) {
         throw new ContractError(`'${caller}' is not referenced in vault`);
     }
-    if (vault[caller].locked === false) {
+    if (vault[caller].lock === false) {
         throw new ContractError(`'${caller}' vault is not lock. Increase vault balance isn't available.`);
     }
     balances[caller] -= qty;
@@ -93,7 +92,7 @@ function vote_waiting_transaction(state, target, voter, qty) {
     if (!(voter in vault)) {
         throw new ContractError(`'${voter}' is not referenced in vault. The vote is not allowed`);
     }
-    if (vault[voter].locked === false) {
+    if (vault[voter].lock === false) {
         throw new ContractError(`'${voter}' vault is not locked. The vote is not allowed`);
     }
     if (voter in waiting_txs_vote.voter) {
@@ -115,8 +114,9 @@ function vote_waiting_transaction(state, target, voter, qty) {
     }
 }
 function balance_vault(state, target) {
+    const vault = state.vault;
     ContractAssert(target, ERR_NOTARGET);
-    return state.vault[target].balance ?? 0;
+    return { balance: vault[target].balance ?? 0, lock: vault[target].lock, block: vault[target].block };
 }
 function balance(state, target) {
     ContractAssert(target, ERR_NOTARGET);
@@ -128,10 +128,10 @@ function check_transfer_args(caller, target, qty) {
     ContractAssert(target, ERR_NOTARGET);
     ContractAssert(target !== caller, "Target must be different from the caller");
 }
-export function handle(state, action) {
+export async function handle(state, action) {
     const input = action.input;
     const caller = action.caller;
-    if (input.function == 'transfer') {
+    if (input.function === 'transfer') {
         const target = input.target;
         const ticker = state.ticker;
         const ticker_target = input.ticker_target;
@@ -149,35 +149,29 @@ export function handle(state, action) {
         }
         return { state };
     }
-    if (input.function == 'balance') {
+    if (input.function === 'balance') {
         const target = input.target;
         const ticker = state.ticker;
-        if (ticker !== "GMX") {
-            throw new ContractError(ERR_TICKER);
-        }
         return { result: { target: ticker, balance: balance(state, target) } };
     }
-    if (input.function == 'balance_vault') {
+    if (input.function === 'balance_vault') {
         const target = input.target;
         const ticker = state.ticker;
-        if (ticker !== "GMX") {
-            throw new ContractError(ERR_TICKER);
-        }
-        return { result: { target: ticker, balance_vault: balance_vault(state, target) } };
+        return { result: { target: ticker, vault: balance_vault(state, target) } };
     }
-    if (input.function == 'lock_vault') {
+    if (input.function === 'lock_vault') {
         const qty = input.qty;
         const vault = state.vault;
-        const block_timer = await SmartWeave.block.height + input.timer;
+        const block_timer = await SmartWeave.block.height + state.timer;
         if (caller in vault) {
             vault[caller] = {};
         }
-        state.vault[caller].locked = true;
+        state.vault[caller].lock = true;
         state.vault[caller].block = block_timer;
         increase_vault(state, caller, qty);
         return { state };
     }
-    if (input.function == 'unlock_vault') {
+    if (input.function === 'unlock_vault') {
         const vault = state.vault;
         const balances = state.balances;
         if (state.vault[caller].block < await SmartWeave.block.height) {
@@ -187,12 +181,12 @@ export function handle(state, action) {
         delete vault[caller];
         return { state };
     }
-    if (input.function == 'increase_vault') {
+    if (input.function === 'increase_vault') {
         const qty = input.qty;
         increase_vault(state, caller, qty);
         return { state };
     }
-    if (input.function == 'vote') {
+    if (input.function === 'vote') {
         const qty = input.qty;
         const voter = input.voter;
         const target = input.target;

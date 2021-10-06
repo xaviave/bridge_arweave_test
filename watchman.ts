@@ -23,8 +23,8 @@ interface State {
 }
 
 const contracts = {
-    GMX: "xAfRen6GU-iQpoWrmqoVrfr9YK-ep8Ww0HGBCzYIFhI",
-    XAV: "Mb0YYVMX5Vb7LzvUlOpKgUWWlw2iw49IXE794T_PIv4"
+    GMX: "ncr5l0U17wzIrwohpLABOrjVs03Bi8oPw6VpY4P9Auo",
+    XAV: "XuS-tOZu3SZiMpK9suHC5NLPLMVvqtLplQxG9DbWlsg"
 };
 
 const validator_wallet_filepath: string = "/mnt/c/Users/hellx/Documents/arweave_wallet/arweave-key-2Jv_ujwc5SjwNYWS7kKOHQMa10Jr2XzN-68K1im8REE.json";
@@ -100,7 +100,7 @@ function process_waiting_transaction(validator_wallet: JWKInterface, contractSta
 async function lock_validator_wallet(contract_id: string, validator_wallet: JWKInterface) {
     // locked validator_wallet for X block
     const address: string = await arweave.wallets.jwkToAddress(validator_wallet);
-    const tx_input = {function: "lock_vault", target: address, voter: validator_wallet, block_timer: 10}
+    const tx_input = {function: "lock_vault", target: address, voter: validator_wallet};
     const tx_id = await Smartweave.interactWrite(arweave, validator_wallet, contract_id, tx_input);
 
     let status: number = 202;
@@ -113,6 +113,32 @@ async function lock_validator_wallet(contract_id: string, validator_wallet: JWKI
     }
 }
 
+async function unlock_validator_wallet(contract_id: string, validator_wallet: JWKInterface) {
+    let block = await arweave.network.getInfo();
+    const address: string = await arweave.wallets.jwkToAddress(validator_wallet);
+    const vault_status_input = {function: "balance_vault", target: validator_wallet};
+    let waiting_block = await Smartweave.interactRead(arweave, validator_wallet, contract_id, vault_status_input);
+
+    while (block["blocks"] < waiting_block["vault"]["block"]) {
+        await new Promise(f => setTimeout(f, 10000));
+        block = await arweave.network.getInfo();
+        waiting_block = await Smartweave.interactRead(arweave, validator_wallet, contract_id, vault_status_input);
+    }
+
+    let status: number = 202;
+    const unlock_input = {function: "unlock_vault", target: address, voter: validator_wallet};
+    const tx_id = await Smartweave.interactWrite(arweave, validator_wallet, contract_id, unlock_input);
+
+    while (status in [202, 404]) {
+        status = await get_status(tx_id);
+        if (status == 404) {
+            await arweave.transactions.post(tx_id);
+        }  
+        await new Promise(f => setTimeout(f, 10000));
+    }
+    console.log(`Wallet ${validator_wallet} successfully unlocked from contract: '${contract_id}'`);
+}
+
 function watch_contracts(validator_wallet: JWKInterface): void {
     Smartweave.readContract(arweave, contracts["GMX"]).then(contractState => {
         lock_validator_wallet(contracts["GMX"], validator_wallet);
@@ -122,7 +148,6 @@ function watch_contracts(validator_wallet: JWKInterface): void {
         lock_validator_wallet(contracts["XAV"], validator_wallet);
         process_waiting_transaction(validator_wallet, contractState, 'states/XAV_initial_state.json');
     });
-    // need to check to unlock vault
 }
 
 (async () => {
@@ -131,4 +156,6 @@ function watch_contracts(validator_wallet: JWKInterface): void {
     console.log("Start watchman")
 
     setInterval(()=> { watch_contracts(validator_wallet) }, reload_interval);
+    unlock_validator_wallet(contracts["GMX"], validator_wallet);
+    unlock_validator_wallet(contracts["XAV"], validator_wallet);
 })()

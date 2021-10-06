@@ -2,7 +2,6 @@ const ERR_NOQTY = "No qty specified";
 const ERR_NEGQTY = "Invalid value for qty. Must be positive";
 const ERR_NOTARGET = "No target specified";
 const ERR_INTEGER = "Invalid value. Must be an integer";
-const ERR_TICKER = "The balance ticker is not allowed.";
 
 declare function ContractError(e: string): void;
 declare function ContractAssert(cond: any, e: string): asserts cond;
@@ -30,10 +29,11 @@ interface Vault {
     */
     balance: number,
     block: number,
-    locked: boolean
+    lock: boolean
 }
 
 type State = {
+    timer: number,
     ticker: string,
     balances: Record<string, number>,
     vault: Record<string, Vault>,
@@ -137,7 +137,7 @@ function increase_vault(state: State, caller: string, qty: number) {
     if (!(caller in vault)) {
         throw new (ContractError as any)(`'${caller}' is not referenced in vault`);
     }
-    if (vault[caller].locked === false) {
+    if (vault[caller].lock === false) {
         throw new (ContractError as any)(`'${caller}' vault is not lock. Increase vault balance isn't available.`);
     }
     balances[caller] -= qty;
@@ -186,7 +186,7 @@ function vote_waiting_transaction(state: State, target: string, voter: string, q
     if (!(voter in vault)) {
         throw new (ContractError as any)(`'${voter}' is not referenced in vault. The vote is not allowed`);
     }
-    if (vault[voter].locked === false) {
+    if (vault[voter].lock === false) {
         throw new (ContractError as any)(`'${voter}' vault is not locked. The vote is not allowed`);
     }
 
@@ -210,9 +210,11 @@ function vote_waiting_transaction(state: State, target: string, voter: string, q
     }
 }
 
-function balance_vault(state: State, target: string): number {
+function balance_vault(state: State, target: string): Object {
+    const vault = state.vault;
+
     ContractAssert(target, ERR_NOTARGET);
-    return state.vault[target].balance ?? 0;
+    return { balance: vault[target].balance ?? 0, lock: vault[target].lock, block: vault[target].block };
 }
 
 function balance(state: State, target: string): number {
@@ -231,7 +233,7 @@ export async function handle(state: State, action: Action): Promise<{state?: Sta
     const input = action.input;
     const caller = action.caller;
     
-    if (input.function == 'transfer') {
+    if (input.function === 'transfer') {
         const target = input.target!;
         const ticker = state.ticker;
         const ticker_target = input.ticker_target;
@@ -250,41 +252,35 @@ export async function handle(state: State, action: Action): Promise<{state?: Sta
         return { state };
     }
     
-    if (input.function == 'balance') {
+    if (input.function === 'balance') {
         const target = input.target!;
         const ticker = state.ticker;
         
-        if (ticker !== "GMX") {
-            throw new (ContractError as any)(ERR_TICKER);
-        }
         return { result: { target: ticker, balance: balance(state, target) } }
     }
     
-    if (input.function == 'balance_vault') {
+    if (input.function === 'balance_vault') {
         const target = input.target!;
         const ticker = state.ticker;
         
-        if (ticker !== "GMX") {
-            throw new (ContractError as any)(ERR_TICKER);
-        }
-        return { result: { target: ticker, balance_vault: balance_vault(state, target) } }
+        return { result: { target: ticker, vault: balance_vault(state, target) } }
     }
 
-    if (input.function == 'lock_vault') {
+    if (input.function === 'lock_vault') {
         const qty = input.qty!;
         const vault = state.vault;
-        const block_timer =  await SmartWeave.block.height + input.timer;
+        const block_timer =  await SmartWeave.block.height + state.timer;
 
         if (caller in vault) {
             vault[caller] = {} as Vault;
         }
-        state.vault[caller].locked = true;
+        state.vault[caller].lock = true;
         state.vault[caller].block = block_timer;
         increase_vault(state, caller, qty)
         return { state };
     }
     
-    if (input.function == 'unlock_vault') {
+    if (input.function === 'unlock_vault') {
         // trasnfer vault balance to caller balance and destroy vault
         const vault = state.vault
         const balances = state.balances;
@@ -297,21 +293,20 @@ export async function handle(state: State, action: Action): Promise<{state?: Sta
         return { state };
     }
         
-    if (input.function == 'increase_vault') {
+    if (input.function === 'increase_vault') {
         const qty = input.qty!;
 
         increase_vault(state, caller, qty)
         return { state };
     }
 
-    if (input.function == 'vote') {
+    if (input.function === 'vote') {
         const qty = input.qty!;
         const voter = input.voter!;
         const target = input.target!;
         
         vote_waiting_transaction(state, target, voter, qty);
         return { state };
-
     }
     
     throw new (ContractError as any)(`No function supplied or function not recognised: "${input.function}".`);
